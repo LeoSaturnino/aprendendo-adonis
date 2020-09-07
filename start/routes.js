@@ -1,5 +1,7 @@
 'use strict'
 
+const { route } = require('@adonisjs/framework/src/Route/Manager')
+
 /*
 |--------------------------------------------------------------------------
 | Routes
@@ -15,7 +17,80 @@
 
 /** @type {typeof import('@adonisjs/framework/src/Route/Manager')} */
 const Route = use('Route')
+const Album = use('App/Models/Album')
+const Song = use('App/Models/Song')
 
 Route.get('/', () => {
   return { greeting: 'Hello world in JSON' }
+})
+
+
+Route.get('/albums', async () => {
+  const albums = await Album.query()
+    .orderBy('id', 'desc').fetch()
+
+  return albums
+})
+
+Route.get('/albums/:id', async ({ params }) => {
+  const album = await Album.query()
+    .with('songs')
+    .where('id', params.id)
+    .first()
+
+  return album
+})
+
+Route.post('/albums', async ({ request }) => {
+  const { artist, album } = request.all()
+
+  const newAlbum = new Album()
+  newAlbum.name = album
+  newAlbum.artist = artist
+
+  await newAlbum.save()
+
+  return newAlbum
+})
+
+Route.delete('/albums/:id', async ({ params }) => {
+  const album = await Album.find(params.id)
+
+  return album.delete()
+})
+
+Route.post('/albums/:id/songs/add', async ({request, params}) => {
+  const song =  new Song()
+  song.album_id = params.id
+  song.name = request.input('name')
+
+  await song.save()
+
+  return song
+})
+
+Route.post('/albums/:id/photo', async ({request, params}) => {
+  const image = request.file('album_image', {
+    types: ['image'],
+    size: ['2mb']
+  })
+
+  await image.move('public/uploads', {
+    name: `${new Date().getTime()}.jpg`
+  })
+
+  const pathImage = `http://localhost:3333/uploads/${image.fileName}`
+
+  const album = await Album.find(params.id)
+  album.image = pathImage
+
+  await album.save()
+
+  return album
+})
+
+Route.delete('/songs/:id', async (params) => {
+  const song = Song.find(params.id)
+
+  return await song.delete()
 })
